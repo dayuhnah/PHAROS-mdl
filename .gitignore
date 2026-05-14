@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+env/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Data
+data/raw/
+data/processed/
+data/splits/
+*.csv
+*.tsv
+*.xlsx
+*.parquet
+*.h5
+*.h5ad
+
+# Model outputs
+checkpoints/
+outputs/
+runs/
+wandb/
+
+# OS
+.DS_Store
+
+# IDE
+.vscode/

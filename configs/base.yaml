@@ -1,0 +1,18 @@
+project_name: "REACTOR"
+seed: 42
+
+data:
+  raw_dir: "data/raw"
+  processed_dir: "data/processed"
+  splits_dir: "data/splits"
+
+model:
+  drug_dim: 2048
+  hidden_dim: 512
+  dropout: 0.2
+
+training:
+  batch_size: 64
+  learning_rate: 0.001
+  epochs: 50
+  test_size: 0.2
