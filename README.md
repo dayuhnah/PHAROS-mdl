@@ -1,6 +1,8 @@
 # PHAROS
 
-PHArmacological Response Oracle with biological Signals.
+**PHAROS** stands for **Pharmacological Hybrid Attention for Resistance-aware Outcome Simulation**.
+
+PHAROS is a resistance-aware and explainable anticancer drug response prediction framework. It integrates molecular drug representations, cancer cell-line gene expression, resistance mechanism features, and explainable AI to predict drug response and eventually drug-induced transcriptomic changes.
 
 ## Project Aim
 
