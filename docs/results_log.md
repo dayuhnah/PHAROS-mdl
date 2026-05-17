@@ -79,4 +79,22 @@ Dataset:
 | PHAROS: Drug + Expression + Resistance | 2 | 0.5165 | 0.6814 | 0.8255 | 0.5347 | 0.0875 | 0.3421 | 0.1063 |
 
 Observation:
-Performance dropped substantially compared with the random split, confirming that unseen-drug prediction is a much harder generalization setting. PHAROS performed similarly to the Drug + Expression baseline but did not improve unseen-drug performance. This suggests that the current Morgan fingerprint representation is insufficient for strong new-compound generalization, motivating a graph-based molecular encoder such as GATv2.
+Performance dropped substantially compared with the random split, confirming that unseen-drug prediction is a much harder generalization setting. PHAROS performed similarly to the Drug + Expression baseline but did not improve unseen-drug performance. This suggests that the current Morgan fingerprint representation is insufficient for strong new-compound generalization, motivating a graph-based molecular encoder such as GATv2.'
+
+## Experiment 4: Unseen-Cell-Line Split
+
+Dataset:
+- DepMap PRISM primary screen
+- 10,000 sampled response pairs
+- Split by unique `depmap_id`
+- Validation cell lines are completely unseen during training
+- Target: log fold-change
+
+| Model | Best Epoch | Train Loss | Val Loss | RMSE | MAE | R2 | Pearson | Spearman |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| Drug Only | 3 | 0.3816 | 0.4547 | 0.6743 | 0.4521 | 0.3891 | 0.6254 | 0.2441 |
+| Drug + Expression | 5 | 0.3264 | 0.4568 | 0.6759 | 0.4571 | 0.3862 | 0.6296 | 0.2751 |
+| PHAROS: Drug + Expression + Resistance | 4 | 0.3608 | 0.4520 | 0.6723 | 0.4532 | 0.3928 | 0.6292 | 0.2579 |
+
+Observation:
+PHAROS achieved the best validation loss, RMSE, and R² in the unseen-cell-line setting, suggesting that resistance-aware features help generalize to unseen cancer cell contexts. Drug + Expression achieved the highest Pearson and Spearman correlation, indicating that future PHAROS improvements should refine the resistance branch for better ranking of response strength.
