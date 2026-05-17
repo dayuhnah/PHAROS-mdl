@@ -35,3 +35,30 @@ Best observed PHAROS epoch:
 
 Observation:
 PHAROS achieved the best Pearson correlation at the final epoch and the best overall validation loss/RMSE/R2 at epoch 4. This suggests resistance-aware features may improve predictive alignment, but early stopping is needed to prevent overfitting.
+
+## Experiment 2: Ablation with Early Stopping
+
+Dataset:
+- DepMap PRISM primary screen
+- 10,000 sampled response pairs
+- 559 cell lines with expression
+- 19,205 expression genes
+- 29 curated resistance genes
+- Target: log fold-change
+
+Split:
+- Random 80/20 train-validation split
+
+Early stopping:
+- Max epochs: 10
+- Patience: 3
+- Best model selected by validation loss
+
+| Model | Best Epoch | Train Loss | Val Loss | RMSE | MAE | R2 | Pearson | Spearman |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| Drug Only | 7 | 0.2850 | 0.4695 | 0.6852 | 0.4671 | 0.3776 | 0.6316 | 0.3035 |
+| Drug + Expression | 6 | 0.3052 | 0.4593 | 0.6778 | 0.4592 | 0.3910 | 0.6293 | 0.2813 |
+| PHAROS Baseline | 4 | 0.3559 | 0.4507 | 0.6713 | 0.4603 | 0.4025 | 0.6367 | 0.2609 |
+
+Observation:
+PHAROS achieved the best validation loss, RMSE, R², and Pearson correlation, suggesting that the resistance-aware branch adds useful predictive signal beyond drug fingerprints and full gene-expression features. However, Drug Only achieved the highest Spearman correlation, indicating that future work should improve rank-order prediction of response strength.

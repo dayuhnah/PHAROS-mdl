@@ -72,21 +72,23 @@ def evaluate(model, loader, loss_fn, device):
     return metrics
 
 
-def run_experiment(model_name, model, train_loader, val_loader, device, epochs=5):
+def run_experiment(model_name, model, train_loader, val_loader, device, epochs=10, patience=3):
     print(f"\n==============================")
     print(f"Running experiment: {model_name}")
-    print(f"==============================")
+    print("==============================")
 
     model = model.to(device)
     loss_fn = nn.MSELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3, weight_decay=1e-5)
 
-    final_metrics = None
+    best_metrics = None
+    best_epoch = 0
+    best_val_loss = float("inf")
+    patience_counter = 0
 
     for epoch in range(1, epochs + 1):
         train_loss = train_one_epoch(model, train_loader, optimizer, loss_fn, device)
         val_metrics = evaluate(model, val_loader, loss_fn, device)
-        final_metrics = val_metrics
 
         print(
             f"{model_name} | Epoch {epoch:02d} | "
@@ -99,11 +101,25 @@ def run_experiment(model_name, model, train_loader, val_loader, device, epochs=5
             f"Spearman: {val_metrics['spearman']:.4f}"
         )
 
-    final_metrics = dict(final_metrics)
-    final_metrics["model"] = model_name
+        if val_metrics["loss"] < best_val_loss:
+            best_val_loss = val_metrics["loss"]
+            best_epoch = epoch
+            best_metrics = dict(val_metrics)
+            best_metrics["train_loss"] = train_loss
+            best_metrics["best_epoch"] = best_epoch
+            patience_counter = 0
+        else:
+            patience_counter += 1
 
-    return final_metrics
+        if patience_counter >= patience:
+            print(
+                f"Early stopping triggered for {model_name} "
+                f"at epoch {epoch}. Best epoch: {best_epoch}"
+            )
+            break
 
+    best_metrics["model"] = model_name
+    return best_metrics
 
 def main():
     set_seed(42)
@@ -181,18 +197,30 @@ def main():
 
     for model_name, model in experiments:
         metrics = run_experiment(
-            model_name=model_name,
-            model=model,
-            train_loader=train_loader,
-            val_loader=val_loader,
-            device=device,
-            epochs=5,
-        )
+    model_name=model_name,
+    model=model,
+    train_loader=train_loader,
+    val_loader=val_loader,
+    device=device,
+    epochs=10,
+    patience=3,
+)
         results.append(metrics)
 
     results_df = pd.DataFrame(results)
 
-    cols = ["model", "loss", "mse", "rmse", "mae", "r2", "pearson", "spearman"]
+    cols = [
+    "model",
+    "best_epoch",
+    "train_loss",
+    "loss",
+    "mse",
+    "rmse",
+    "mae",
+    "r2",
+    "pearson",
+    "spearman",
+    ]
     cols = [col for col in cols if col in results_df.columns]
     results_df = results_df[cols]
 
