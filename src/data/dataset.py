@@ -102,3 +102,18 @@ class PharosDepMapDataset(Dataset):
             "resistance_expr": torch.tensor(resistance_expr, dtype=torch.float32),
             "label": torch.tensor([label], dtype=torch.float32),
         }
+    
+    def get_metadata(self) -> pd.DataFrame:
+        """Return response metadata for splitting and analysis."""
+        cols = [
+            "depmap_id",
+            "broad_id",
+            "name",
+            "dose",
+            "logfold_change",
+            "moa",
+            "target",
+            "smiles",
+        ]
+        cols = [col for col in cols if col in self.response.columns]
+        return self.response[cols].copy()

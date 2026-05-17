@@ -62,3 +62,21 @@ Early stopping:
 
 Observation:
 PHAROS achieved the best validation loss, RMSE, R², and Pearson correlation, suggesting that the resistance-aware branch adds useful predictive signal beyond drug fingerprints and full gene-expression features. However, Drug Only achieved the highest Spearman correlation, indicating that future work should improve rank-order prediction of response strength.
+
+## Experiment 3: Unseen-Drug Split
+
+Dataset:
+- DepMap PRISM primary screen
+- 10,000 sampled response pairs
+- Split by unique `broad_id`
+- Validation drugs are completely unseen during training
+- Target: log fold-change
+
+| Model | Best Epoch | Train Loss | Val Loss | RMSE | MAE | R2 | Pearson | Spearman |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| Drug Only | 1 | 0.6309 | 0.6719 | 0.8197 | 0.5377 | 0.1001 | 0.3328 | 0.1292 |
+| Drug + Expression | 2 | 0.5144 | 0.6752 | 0.8217 | 0.5312 | 0.0957 | 0.3429 | 0.1141 |
+| PHAROS: Drug + Expression + Resistance | 2 | 0.5165 | 0.6814 | 0.8255 | 0.5347 | 0.0875 | 0.3421 | 0.1063 |
+
+Observation:
+Performance dropped substantially compared with the random split, confirming that unseen-drug prediction is a much harder generalization setting. PHAROS performed similarly to the Drug + Expression baseline but did not improve unseen-drug performance. This suggests that the current Morgan fingerprint representation is insufficient for strong new-compound generalization, motivating a graph-based molecular encoder such as GATv2.
