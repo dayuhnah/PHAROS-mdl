@@ -66,13 +66,20 @@ class PharosDepMapDataset(Dataset):
         self.gene_cols = list(expression.columns)
 
         self.available_resistance_genes = [
-            gene for gene in RESISTANCE_GENES if gene in expression.columns
+            gene for gene in RESISTANCE_GENES
+            if gene in expression.columns
+        ]
+
+        self.non_resistance_gene_cols = [
+            gene for gene in self.gene_cols
+            if gene not in self.available_resistance_genes
         ]
 
         print(f"Dataset rows: {len(self.response)}")
         print(f"Expression genes: {len(self.gene_cols)}")
         print(f"Available resistance genes: {len(self.available_resistance_genes)}")
         print(self.available_resistance_genes)
+        print(f"Non-resistance expression genes: {len(self.non_resistance_gene_cols)}")
 
     def __len__(self):
         return len(self.response)
@@ -89,7 +96,10 @@ class PharosDepMapDataset(Dataset):
             n_bits=self.fingerprint_bits,
         )
 
-        cell_expr = self.expression.loc[depmap_id, self.gene_cols].values.astype(np.float32)
+        cell_expr = self.expression.loc[
+        depmap_id,
+        self.non_resistance_gene_cols,
+        ].values.astype(np.float32)
 
         resistance_expr = self.expression.loc[
             depmap_id,
