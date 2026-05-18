@@ -6,6 +6,7 @@ import torch
 from torch.utils.data import Dataset
 
 from src.data.featurize_smiles import smiles_to_morgan_fp
+from src.data.featurize_smiles import smiles_to_morgan_fp
 
 
 RESISTANCE_GENES = [
@@ -30,10 +31,12 @@ class PharosDepMapDataset(Dataset):
         self,
         response_path: str | Path = "data/processed/pharos_depmap_response_pairs.parquet",
         expression_path: str | Path = "data/processed/pharos_depmap_expression.parquet",
+        fingerprint_cache_path: str | Path = "data/processed/pharos_drug_fingerprints.npz",
         max_rows: int | None = 100_000,
         fingerprint_bits: int = 2048,
     ):
         self.fingerprint_bits = fingerprint_bits
+        self.fingerprint_cache = self._load_fingerprint_cache(fingerprint_cache_path)
 
         print("Loading response pairs...")
         response = pd.read_parquet(response_path)
@@ -81,6 +84,26 @@ class PharosDepMapDataset(Dataset):
         print(self.available_resistance_genes)
         print(f"Non-resistance expression genes: {len(self.non_resistance_gene_cols)}")
 
+    def _load_fingerprint_cache(self, fingerprint_cache_path: str | Path) -> dict[str, np.ndarray]:
+        """Load cached Morgan fingerprints if available."""
+        fingerprint_cache_path = Path(fingerprint_cache_path)
+
+        if not fingerprint_cache_path.exists():
+            print("Fingerprint cache not found. Falling back to on-the-fly RDKit featurization.")
+            return {}
+
+        cache = np.load(fingerprint_cache_path, allow_pickle=True)
+        broad_ids = cache["broad_ids"]
+        fingerprints = cache["fingerprints"]
+
+        fingerprint_map = {
+            str(broad_id): fingerprints[i].astype(np.float32)
+            for i, broad_id in enumerate(broad_ids)
+        }
+
+        print(f"Loaded cached fingerprints for {len(fingerprint_map)} drugs.")
+        return fingerprint_map
+
     def __len__(self):
         return len(self.response)
 
@@ -88,13 +111,17 @@ class PharosDepMapDataset(Dataset):
         row = self.response.iloc[idx]
 
         depmap_id = row["depmap_id"]
+        broad_id = str(row["broad_id"])
         smiles = row["smiles"]
         label = row["logfold_change"]
 
-        drug_fp = smiles_to_morgan_fp(
-            smiles,
-            n_bits=self.fingerprint_bits,
-        )
+        if broad_id in self.fingerprint_cache:
+            drug_fp = self.fingerprint_cache[broad_id]
+        else:
+            drug_fp = smiles_to_morgan_fp(
+                smiles,
+                n_bits=self.fingerprint_bits,
+            )
 
         cell_expr = self.expression.loc[
         depmap_id,
