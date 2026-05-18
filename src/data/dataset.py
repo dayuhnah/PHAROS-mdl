@@ -36,11 +36,15 @@ class PharosDepMapDataset(Dataset):
         fingerprint_bits: int = 2048,
         cell_embedding_cache_path: str | Path | None = None,
         use_cell_embeddings: bool = False,
+        drug_embedding_cache_path: str | Path | None = None,
+        use_drug_embeddings: bool = False,
     ):
         self.fingerprint_bits = fingerprint_bits
         self.fingerprint_cache = self._load_fingerprint_cache(fingerprint_cache_path)
         self.use_cell_embeddings = use_cell_embeddings
         self.cell_embedding_cache = self._load_cell_embedding_cache(cell_embedding_cache_path)
+        self.use_drug_embeddings = use_drug_embeddings
+        self.drug_embedding_cache = self._load_drug_embedding_cache(drug_embedding_cache_path)
 
         print("Loading response pairs...")
         response = pd.read_parquet(response_path)
@@ -87,6 +91,29 @@ class PharosDepMapDataset(Dataset):
         print(f"Available resistance genes: {len(self.available_resistance_genes)}")
         print(self.available_resistance_genes)
         print(f"Non-resistance expression genes: {len(self.non_resistance_gene_cols)}")
+
+    def _load_drug_embedding_cache(self, drug_embedding_cache_path: str | Path | None) -> dict[str, np.ndarray]:
+        """Load pretrained drug embeddings if available."""
+        if drug_embedding_cache_path is None:
+            return {}
+
+        drug_embedding_cache_path = Path(drug_embedding_cache_path)
+
+        if not drug_embedding_cache_path.exists():
+            print("Drug embedding cache not found. Falling back to Morgan fingerprints.")
+            return {}
+
+        cache = np.load(drug_embedding_cache_path, allow_pickle=True)
+        broad_ids = cache["broad_ids"]
+        embeddings = cache["embeddings"]
+
+        embedding_map = {
+            str(broad_id): embeddings[i].astype(np.float32)
+            for i, broad_id in enumerate(broad_ids)
+        }
+
+        print(f"Loaded pretrained drug embeddings for {len(embedding_map)} drugs.")
+        return embedding_map
 
     def _load_fingerprint_cache(self, fingerprint_cache_path: str | Path) -> dict[str, np.ndarray]:
         """Load cached Morgan fingerprints if available."""
@@ -142,6 +169,11 @@ class PharosDepMapDataset(Dataset):
         smiles = row["smiles"]
         label = row["logfold_change"]
 
+        if self.use_drug_embeddings and broad_id in self.drug_embedding_cache:
+            drug_embedding = self.drug_embedding_cache[broad_id]
+        else:
+            drug_embedding = drug_fp
+
         if broad_id in self.fingerprint_cache:
             drug_fp = self.fingerprint_cache[broad_id]
         else:
@@ -171,6 +203,7 @@ class PharosDepMapDataset(Dataset):
             "resistance_expr": torch.tensor(resistance_expr, dtype=torch.float32),
             "label": torch.tensor([label], dtype=torch.float32),
             "cell_embedding":torch.tensor(cell_embedding, dtype=torch.float32),
+            "drug_embedding":torch.tensor(drug_embedding, dtype=torch.float32),
         }
     
     def get_metadata(self) -> pd.DataFrame:
