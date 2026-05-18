@@ -34,9 +34,13 @@ class PharosDepMapDataset(Dataset):
         fingerprint_cache_path: str | Path = "data/processed/pharos_drug_fingerprints.npz",
         max_rows: int | None = 100_000,
         fingerprint_bits: int = 2048,
+        cell_embedding_cache_path: str | Path | None = None,
+        use_cell_embeddings: bool = False,
     ):
         self.fingerprint_bits = fingerprint_bits
         self.fingerprint_cache = self._load_fingerprint_cache(fingerprint_cache_path)
+        self.use_cell_embeddings = use_cell_embeddings
+        self.cell_embedding_cache = self._load_cell_embedding_cache(cell_embedding_cache_path)
 
         print("Loading response pairs...")
         response = pd.read_parquet(response_path)
@@ -103,6 +107,29 @@ class PharosDepMapDataset(Dataset):
 
         print(f"Loaded cached fingerprints for {len(fingerprint_map)} drugs.")
         return fingerprint_map
+    
+    def _load_cell_embedding_cache(self, cell_embedding_cache_path: str | Path | None) -> dict[str, np.ndarray]:
+        """Load precomputed cell embeddings if available."""
+        if cell_embedding_cache_path is None:
+            return {}
+
+        cell_embedding_cache_path = Path(cell_embedding_cache_path)
+
+        if not cell_embedding_cache_path.exists():
+            print("Cell embedding cache not found. Falling back to raw expression.")
+            return {}
+
+        cache = np.load(cell_embedding_cache_path, allow_pickle=True)
+        depmap_ids = cache["depmap_ids"]
+        embeddings = cache["embeddings"]
+
+        embedding_map = {
+            str(depmap_id): embeddings[i].astype(np.float32)
+            for i, depmap_id in enumerate(depmap_ids)
+        }
+
+        print(f"Loaded cached cell embeddings for {len(embedding_map)} cell lines.")
+        return embedding_map
 
     def __len__(self):
         return len(self.response)
@@ -128,6 +155,11 @@ class PharosDepMapDataset(Dataset):
         self.non_resistance_gene_cols,
         ].values.astype(np.float32)
 
+        if self.use_cell_embeddings and depmap_id in self.cell_embedding_cache:
+            cell_embedding = self.cell_embedding_cache[depmap_id]
+        else:
+            cell_embedding = cell_expr
+
         resistance_expr = self.expression.loc[
             depmap_id,
             self.available_resistance_genes,
@@ -138,6 +170,7 @@ class PharosDepMapDataset(Dataset):
             "cell_expr": torch.tensor(cell_expr, dtype=torch.float32),
             "resistance_expr": torch.tensor(resistance_expr, dtype=torch.float32),
             "label": torch.tensor([label], dtype=torch.float32),
+            "cell_embedding":torch.tensor(cell_embedding, dtype=torch.float32),
         }
     
     def get_metadata(self) -> pd.DataFrame:
