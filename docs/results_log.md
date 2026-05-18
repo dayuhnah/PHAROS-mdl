@@ -164,3 +164,28 @@ Best result:
 
 Observation:
 The PCA embedding pathway worked successfully, confirming that PHAROS can support external cell embeddings. However, PCA embeddings did not outperform the raw-expression PHAROS model, which achieved RMSE 0.6757, R² 0.3941, and Pearson 0.6333. This suggests that simple dimensionality reduction loses some predictive signal, and future work should replace PCA embeddings with biologically pretrained representations such as scGPT, Geneformer, or scFoundation.
+
+## Experiment 8: Pretrained ChemBERTa Drug Embedding Integration
+
+A pretrained drug embedding pathway was added to PHAROS using ChemBERTa SMILES embeddings. The goal was to test whether pretrained molecular representations could replace handcrafted Morgan fingerprints.
+
+Setup:
+- Pretrained model: ChemBERTa
+- Input: SMILES strings
+- Embedding dimension: 768
+- Number of drugs embedded: 4,684
+- Cell input: non-resistance expression genes
+- Resistance input: 29-gene resistance panel
+- Target: PRISM log fold-change
+
+Best result:
+
+| Model | Best Epoch | Train Loss | Val Loss | RMSE | MAE | R2 | Pearson | Spearman |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| PHAROS with ChemBERTa drug embeddings | 9 | 0.6743 | 0.6698 | 0.8184 | 0.5146 | 0.1120 | 0.3445 | 0.1450 |
+
+Comparison:
+The ChemBERTa-based PHAROS model underperformed the main Morgan fingerprint PHAROS model, which achieved RMSE 0.6757, R² 0.3941, and Pearson 0.6333.
+
+Observation:
+The pretrained drug embedding pathway was successfully integrated, but frozen ChemBERTa embeddings did not outperform Morgan fingerprints. This suggests that pretrained molecular embeddings may require fine-tuning, better pooling, or a graph-based molecular encoder to be effective for drug response prediction.
