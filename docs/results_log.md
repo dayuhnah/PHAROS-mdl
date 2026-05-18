@@ -124,3 +124,43 @@ After correcting the feature separation, PHAROS did not outperform the simpler b
 
 Observation:
 In the unseen-cell-line split, PHAROS achieved the best validation loss, RMSE, R², and Pearson correlation. This suggests that the dedicated resistance branch is more useful for generalizing to unseen cancer cell contexts, which aligns with the biological motivation of the project.
+
+## Experiment 6: Main Modular PHAROS Model
+
+The modular PHAROS model was trained using the updated architecture with separate drug, expression, and resistance encoders.
+
+Architecture:
+- Drug encoder: cached Morgan fingerprint encoder
+- Cell encoder: non-resistance gene expression encoder
+- Resistance encoder: 29-gene resistance panel encoder
+- Fusion: bioactivity bridge MLP
+- Output: PRISM log fold-change response
+
+Best epoch result:
+
+| Best Epoch | Train Loss | Val Loss | RMSE | MAE | R2 | Pearson | Spearman |
+|---:|---:|---:|---:|---:|---:|---:|---:|
+| 6 | 0.3208 | 0.4566 | 0.6757 | 0.4567 | 0.3941 | 0.6333 | 0.2813 |
+
+Observation:
+The modular PHAROS model trains successfully and achieves similar performance to the corrected ablation experiments. This confirms that the model has been refactored into a replaceable architecture without losing baseline performance. The current Morgan fingerprint and MLP encoders can now be substituted with graph-based or pretrained encoders in later phases.
+
+## Experiment 7: Pretrained-Ready Cell Embedding Pathway
+
+A pretrained-ready cell embedding pathway was added to PHAROS. Instead of directly using the full raw expression vector, the dataset can now optionally load precomputed cell embeddings. This is designed so that future scGPT, Geneformer, or scFoundation embeddings can be plugged into PHAROS without changing the rest of the architecture.
+
+For the initial prototype, PCA was used to generate 256-dimensional cell embeddings from DepMap expression profiles.
+
+Embedding setup:
+- Input expression matrix: 559 cell lines × 19,205 genes
+- PCA embedding dimension: 256
+- Explained variance: 83.83%
+
+Best result:
+
+| Model | Best Epoch | Train Loss | Val Loss | RMSE | MAE | R2 | Pearson | Spearman |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| PHAROS with PCA cell embeddings | 9 | 0.2161 | 0.4910 | 0.7007 | 0.4829 | 0.3490 | 0.5940 | 0.2930 |
+
+Observation:
+The PCA embedding pathway worked successfully, confirming that PHAROS can support external cell embeddings. However, PCA embeddings did not outperform the raw-expression PHAROS model, which achieved RMSE 0.6757, R² 0.3941, and Pearson 0.6333. This suggests that simple dimensionality reduction loses some predictive signal, and future work should replace PCA embeddings with biologically pretrained representations such as scGPT, Geneformer, or scFoundation.
