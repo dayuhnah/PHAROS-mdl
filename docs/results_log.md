@@ -98,3 +98,29 @@ Dataset:
 
 Observation:
 PHAROS achieved the best validation loss, RMSE, and R² in the unseen-cell-line setting, suggesting that resistance-aware features help generalize to unseen cancer cell contexts. Drug + Expression achieved the highest Pearson and Spearman correlation, indicating that future PHAROS improvements should refine the resistance branch for better ranking of response strength.
+
+## Experiment 5: Corrected Resistance Feature Separation
+
+In this experiment, the 29 curated resistance genes were removed from the general expression vector and passed only through the dedicated PHAROS resistance branch. This makes the ablation cleaner because the Drug + Expression baseline no longer has direct access to the resistance panel.
+
+### Corrected Random Split
+
+| Model | Best Epoch | Train Loss | Val Loss | RMSE | MAE | R2 | Pearson | Spearman |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| Drug Only | 5 | 0.3165 | 0.4515 | 0.6719 | 0.4581 | 0.4015 | 0.6381 | 0.2840 |
+| Drug + Expression | 6 | 0.3010 | 0.4523 | 0.6725 | 0.4607 | 0.4003 | 0.6400 | 0.2852 |
+| PHAROS Baseline | 5 | 0.3285 | 0.4665 | 0.6830 | 0.4653 | 0.3815 | 0.6347 | 0.2748 |
+
+Observation:
+After correcting the feature separation, PHAROS did not outperform the simpler baselines in the random split. This suggests that the current resistance branch, which is fused by simple concatenation, is not yet strong enough to consistently improve random drug-cell response prediction.
+
+### Corrected Unseen-Cell-Line Split
+
+| Model | Best Epoch | Train Loss | Val Loss | RMSE | MAE | R2 | Pearson | Spearman |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| Drug Only | 6 | 0.2939 | 0.4588 | 0.6773 | 0.4542 | 0.3836 | 0.6260 | 0.2860 |
+| Drug + Expression | 4 | 0.3555 | 0.4545 | 0.6742 | 0.4409 | 0.3894 | 0.6283 | 0.2687 |
+| PHAROS | 5 | 0.3357 | 0.4512 | 0.6717 | 0.4492 | 0.3938 | 0.6290 | 0.2742 |
+
+Observation:
+In the unseen-cell-line split, PHAROS achieved the best validation loss, RMSE, R², and Pearson correlation. This suggests that the dedicated resistance branch is more useful for generalizing to unseen cancer cell contexts, which aligns with the biological motivation of the project.
