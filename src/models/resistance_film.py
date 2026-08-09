@@ -3,9 +3,9 @@ import torch.nn as nn
 
 class ResistanceFiLM(nn.Module):
 
-    def __init(
+    def __init__(
             self,
-            drug_dum,
+            drug_dim,
             resistance_dim=29,
             hidden_dim=128,
             output_dim=128,
@@ -17,14 +17,14 @@ class ResistanceFiLM(nn.Module):
             nn.Linear(resistance_dim, hidden_dim),
             nn.ReLU(),
             nn.Dropout(dropout),
-            nn.Liner(hidden_dim, output_dim),
+            nn.Linear(hidden_dim, output_dim),
             nn.ReLU(),
         )
 
         self.film_generator = nn.Sequential(
-            nn.Liner(drug_dim, hidden_dim),
+            nn.Linear(drug_dim, hidden_dim),
             nn.ReLU(),
-            nn.Liner(hidden_dim, output_dim * 2),
+            nn.Linear(hidden_dim, output_dim * 2),
         )
 
     def forward(self, resistance_features, drug_embedding):
@@ -33,7 +33,7 @@ class ResistanceFiLM(nn.Module):
         flim_params = self.film_generator(drug_embedding)
 
         gamma, beta = torch.chunk(
-            film_params,
+            flim_params,
             chunks=2,
             dim=-1,
         )

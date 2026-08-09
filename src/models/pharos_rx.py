@@ -15,7 +15,7 @@ class PharosRXModel(nn.Module):
             drug_out_dim: int = 256,
             cell_out_dim: int = 256,
             resistance_out_dim: int = 64,
-            droupout: float = 0.2,
+            dropout: float = 0.2,
     ):
         super().__init__()
 
@@ -23,14 +23,14 @@ class PharosRXModel(nn.Module):
             drug_dim=drug_dim,
             hidden_dim=hidden_dim,
             out_dim=drug_out_dim,
-            dropout=droupout,
+            dropout=dropout,
         )
 
         self.cell_encoder = ExpressionEncoder(
             cell_dim=cell_dim,
             hidden_dim=hidden_dim,
             out_dim=cell_out_dim,
-            dropout=droupout
+            dropout=dropout,
         )
 
         self.resistance_film = ResistanceFiLM(
@@ -38,7 +38,7 @@ class PharosRXModel(nn.Module):
             resistance_dim=resistance_dim,
             hidden_dim=128,
             output_dim=resistance_out_dim,
-            dropout=droupout
+            dropout=dropout,
         )
 
         fusion_dim = (
@@ -46,9 +46,9 @@ class PharosRXModel(nn.Module):
         )
 
         self.bioactivity_bridge = nn.Sequential(
-            nn.Liner(fusion_dim, hidden_dim),
+            nn.Linear(fusion_dim, hidden_dim),
             nn.ReLU(),
-            nn.Dropout(droupout),
+            nn.Dropout(dropout),
 
             nn.Linear(hidden_dim, hidden_dim // 2),
             nn.ReLU(),
