@@ -4,7 +4,6 @@ import torch.nn as nn
 from src.models.cell_encoder import ExpressionEncoder
 from src.models.drug_encoder import MorganFingerprintEncoder
 from src.models.resistance_film import ResistanceFiLM
-from src.models.pharos_rx import PharosRXModel
 
 class PharosRXModel(nn.Module):
     def __init__(
