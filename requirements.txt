@@ -9,3 +9,6 @@ pyyaml
 captum
 rdkit
 scipy
+pyarrow
+transformers
+tokenizers
