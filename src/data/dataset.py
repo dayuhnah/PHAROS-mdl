@@ -55,54 +55,34 @@ class PharosDepMapDataset(Dataset):
         # ---------------------------------
         # Morgan fingerprint cache
         # ---------------------------------
-
-        self.fingerprint_cache = (
-            self._load_fingerprint_cache(
-                fingerprint_cache_path
-            )
+        self.fingerprint_cache = self._load_fingerprint_cache(
+            fingerprint_cache_path
         )
 
         # ---------------------------------
         # Optional pretrained cell embeddings
         # ---------------------------------
-
-        self.use_cell_embeddings = (
-            use_cell_embeddings
-        )
-
-        self.cell_embedding_cache = (
-            self._load_cell_embedding_cache(
-                cell_embedding_cache_path
-            )
+        self.use_cell_embeddings = use_cell_embeddings
+        self.cell_embedding_cache = self._load_cell_embedding_cache(
+            cell_embedding_cache_path
         )
 
         # ---------------------------------
         # Optional pretrained drug embeddings
         # ---------------------------------
-
-        self.use_drug_embeddings = (
-            use_drug_embeddings
-        )
-
-        self.drug_embedding_cache = (
-            self._load_drug_embedding_cache(
-                drug_embedding_cache_path
-            )
+        self.use_drug_embeddings = use_drug_embeddings
+        self.drug_embedding_cache = self._load_drug_embedding_cache(
+            drug_embedding_cache_path
         )
 
         # ---------------------------------
         # Molecular graph cache
         # ---------------------------------
-
-        self.use_drug_graphs = (
-            use_drug_graphs
-        )
+        self.use_drug_graphs = use_drug_graphs
 
         if self.use_drug_graphs:
-            self.drug_graph_cache = (
-                self._load_drug_graph_cache(
-                    drug_graph_cache_path
-                )
+            self.drug_graph_cache = self._load_drug_graph_cache(
+                drug_graph_cache_path
             )
         else:
             self.drug_graph_cache = {}
@@ -110,23 +90,15 @@ class PharosDepMapDataset(Dataset):
         # =================================
         # Load response data
         # =================================
-
         print("Loading response pairs...")
-
-        response = pd.read_parquet(
-            response_path
-        )
+        response = pd.read_parquet(response_path)
 
         print("Loading expression matrix...")
-
-        expression = pd.read_parquet(
-            expression_path
-        )
+        expression = pd.read_parquet(expression_path)
 
         # ---------------------------------
         # Require usable response rows
         # ---------------------------------
-
         response = response.dropna(
             subset=[
                 "smiles",
@@ -139,24 +111,16 @@ class PharosDepMapDataset(Dataset):
         # ---------------------------------
         # Fixed pilot sample
         # ---------------------------------
-
-        if (
-            max_rows is not None
-            and len(response) > max_rows
-        ):
+        if max_rows is not None and len(response) > max_rows:
             response = response.sample(
                 n=max_rows,
                 random_state=42,
-            ).reset_index(
-                drop=True
-            )
+            ).reset_index(drop=True)
 
         # ---------------------------------
         # Clean expression gene names
         # ---------------------------------
-
         expression = expression.copy()
-
         expression.columns = [
             (
                 "depmap_id"
@@ -165,48 +129,30 @@ class PharosDepMapDataset(Dataset):
             )
             for col in expression.columns
         ]
-
-        expression = expression.set_index(
-            "depmap_id"
-        )
+        expression = expression.set_index("depmap_id")
 
         # ---------------------------------
         # Keep cells with expression
         # ---------------------------------
-
         response = response[
-            response["depmap_id"].isin(
-                expression.index
-            )
-        ].reset_index(
-            drop=True
-        )
+            response["depmap_id"].isin(expression.index)
+        ].reset_index(drop=True)
 
         # ---------------------------------
         # If using molecular graphs:
         # keep only graph-covered drugs
         # ---------------------------------
-
         if self.use_drug_graphs:
-
             before = len(response)
-
-            graph_drug_ids = set(
-                self.drug_graph_cache.keys()
-            )
+            graph_drug_ids = set(self.drug_graph_cache.keys())
 
             response = response[
                 response["broad_id"]
                 .astype(str)
                 .isin(graph_drug_ids)
-            ].reset_index(
-                drop=True
-            )
+            ].reset_index(drop=True)
 
-            removed = (
-                before - len(response)
-            )
-
+            removed = before - len(response)
             print(
                 f"Removed {removed} response rows "
                 f"without molecular graphs."
@@ -218,10 +164,7 @@ class PharosDepMapDataset(Dataset):
         # =================================
         # Gene partitions
         # =================================
-
-        self.gene_cols = list(
-            expression.columns
-        )
+        self.gene_cols = list(expression.columns)
 
         self.available_resistance_genes = [
             gene
@@ -232,39 +175,91 @@ class PharosDepMapDataset(Dataset):
         self.non_resistance_gene_cols = [
             gene
             for gene in self.gene_cols
-            if gene
-            not in self.available_resistance_genes
+            if gene not in self.available_resistance_genes
         ]
 
-        print(
-            f"Dataset rows: "
-            f"{len(self.response)}"
+        # =================================
+        # PPI gene alignment
+        # =================================
+        ppi_graph_path = Path(
+            "data/processed/pharos_ppi_graph.pt"
         )
 
-        print(
-            f"Expression genes: "
-            f"{len(self.gene_cols)}"
+        if not ppi_graph_path.exists():
+            raise FileNotFoundError(
+                f"PPI graph not found: {ppi_graph_path}"
+            )
+
+        ppi_graph = torch.load(
+            ppi_graph_path,
+            map_location="cpu",
+            weights_only=False,
         )
 
+        if "genes" not in ppi_graph:
+            raise KeyError(
+                "PPI graph file does not contain a 'genes' field."
+            )
+
+        self.ppi_gene_cols = list(ppi_graph["genes"])
+
+        # ---------------------------------
+        # Validate PPI genes
+        # ---------------------------------
+        missing_ppi_genes = [
+            gene
+            for gene in self.ppi_gene_cols
+            if gene not in expression.columns
+        ]
+
+        if missing_ppi_genes:
+            raise ValueError(
+                "PPI graph contains genes that are missing from "
+                "the expression matrix: "
+                f"{missing_ppi_genes[:20]}"
+            )
+
+        # PPI graph should contain only non-resistance genes.
+        ppi_resistance_overlap = [
+            gene
+            for gene in self.ppi_gene_cols
+            if gene in self.available_resistance_genes
+        ]
+
+        if ppi_resistance_overlap:
+            raise ValueError(
+                "PPI genes unexpectedly overlap with resistance genes: "
+                f"{ppi_resistance_overlap}"
+            )
+
+        # Optional sanity check: duplicate gene names would make node-to-
+        # expression alignment ambiguous.
+        if len(set(self.ppi_gene_cols)) != len(self.ppi_gene_cols):
+            raise ValueError(
+                "PPI graph contains duplicate gene names; exact node-to-gene "
+                "alignment cannot be guaranteed."
+            )
+
+        print(f"Dataset rows: {len(self.response)}")
+        print(f"Expression genes: {len(self.gene_cols)}")
         print(
-            f"Available resistance genes: "
+            "Available resistance genes: "
             f"{len(self.available_resistance_genes)}"
         )
-
+        print(self.available_resistance_genes)
         print(
-            self.available_resistance_genes
-        )
-
-        print(
-            f"Non-resistance expression genes: "
+            "Non-resistance expression genes: "
             f"{len(self.non_resistance_gene_cols)}"
+        )
+        print(
+            "PPI-aligned expression genes: "
+            f"{len(self.ppi_gene_cols)}"
         )
 
         if self.use_drug_graphs:
             print(
-                f"Loaded molecular graph mode "
-                f"with {len(self.drug_graph_cache)} "
-                f"cached drugs."
+                f"Loaded molecular graph mode with "
+                f"{len(self.drug_graph_cache)} cached drugs."
             )
 
     # =====================================
@@ -275,18 +270,12 @@ class PharosDepMapDataset(Dataset):
         self,
         drug_graph_cache_path: str | Path,
     ) -> dict:
-        """
-        Load cached PyTorch Geometric molecular graphs.
-        """
-
-        path = Path(
-            drug_graph_cache_path
-        )
+        """Load cached PyTorch Geometric molecular graphs."""
+        path = Path(drug_graph_cache_path)
 
         if not path.exists():
             raise FileNotFoundError(
-                f"Drug graph cache not found: "
-                f"{path}"
+                f"Drug graph cache not found: {path}"
             )
 
         cache = torch.load(
@@ -297,30 +286,23 @@ class PharosDepMapDataset(Dataset):
 
         if not isinstance(cache, dict):
             raise TypeError(
-                "Expected molecular graph cache "
-                "to be a dictionary."
+                "Expected molecular graph cache to be a dictionary."
             )
 
-        # Ensure all identifiers are strings
         cache = {
             str(broad_id): graph
-            for broad_id, graph
-            in cache.items()
+            for broad_id, graph in cache.items()
         }
 
         print(
-            f"Loaded cached molecular graphs "
-            f"for {len(cache)} drugs."
+            f"Loaded cached molecular graphs for {len(cache)} drugs."
         )
-
         return cache
 
     def _load_drug_embedding_cache(
         self,
-        drug_embedding_cache_path:
-            str | Path | None,
+        drug_embedding_cache_path: str | Path | None,
     ) -> dict[str, np.ndarray]:
-
         if drug_embedding_cache_path is None:
             return {}
 
@@ -329,12 +311,10 @@ class PharosDepMapDataset(Dataset):
         )
 
         if not drug_embedding_cache_path.exists():
-
             print(
                 "Drug embedding cache not found. "
                 "Falling back to Morgan fingerprints."
             )
-
             return {}
 
         cache = np.load(
@@ -346,39 +326,29 @@ class PharosDepMapDataset(Dataset):
         embeddings = cache["embeddings"]
 
         embedding_map = {
-            str(broad_id):
-                embeddings[i].astype(
-                    np.float32
-                )
-            for i, broad_id
-            in enumerate(broad_ids)
+            str(broad_id): embeddings[i].astype(np.float32)
+            for i, broad_id in enumerate(broad_ids)
         }
 
         print(
             f"Loaded pretrained drug embeddings "
             f"for {len(embedding_map)} drugs."
         )
-
         return embedding_map
 
     def _load_fingerprint_cache(
         self,
-        fingerprint_cache_path:
-            str | Path,
+        fingerprint_cache_path: str | Path,
     ) -> dict[str, np.ndarray]:
-
         fingerprint_cache_path = Path(
             fingerprint_cache_path
         )
 
         if not fingerprint_cache_path.exists():
-
             print(
                 "Fingerprint cache not found. "
-                "Falling back to on-the-fly "
-                "RDKit featurization."
+                "Falling back to on-the-fly RDKit featurization."
             )
-
             return {}
 
         cache = np.load(
@@ -390,27 +360,20 @@ class PharosDepMapDataset(Dataset):
         fingerprints = cache["fingerprints"]
 
         fingerprint_map = {
-            str(broad_id):
-                fingerprints[i].astype(
-                    np.float32
-                )
-            for i, broad_id
-            in enumerate(broad_ids)
+            str(broad_id): fingerprints[i].astype(np.float32)
+            for i, broad_id in enumerate(broad_ids)
         }
 
         print(
-            f"Loaded cached fingerprints "
-            f"for {len(fingerprint_map)} drugs."
+            f"Loaded cached fingerprints for "
+            f"{len(fingerprint_map)} drugs."
         )
-
         return fingerprint_map
 
     def _load_cell_embedding_cache(
         self,
-        cell_embedding_cache_path:
-            str | Path | None,
+        cell_embedding_cache_path: str | Path | None,
     ) -> dict[str, np.ndarray]:
-
         if cell_embedding_cache_path is None:
             return {}
 
@@ -419,12 +382,10 @@ class PharosDepMapDataset(Dataset):
         )
 
         if not cell_embedding_cache_path.exists():
-
             print(
                 "Cell embedding cache not found. "
                 "Falling back to raw expression."
             )
-
             return {}
 
         cache = np.load(
@@ -436,19 +397,14 @@ class PharosDepMapDataset(Dataset):
         embeddings = cache["embeddings"]
 
         embedding_map = {
-            str(depmap_id):
-                embeddings[i].astype(
-                    np.float32
-                )
-            for i, depmap_id
-            in enumerate(depmap_ids)
+            str(depmap_id): embeddings[i].astype(np.float32)
+            for i, depmap_id in enumerate(depmap_ids)
         }
 
         print(
             f"Loaded cached cell embeddings "
             f"for {len(embedding_map)} cell lines."
         )
-
         return embedding_map
 
     # =====================================
@@ -456,44 +412,22 @@ class PharosDepMapDataset(Dataset):
     # =====================================
 
     def __len__(self):
-        return len(
-            self.response
-        )
+        return len(self.response)
 
     def __getitem__(self, idx):
+        row = self.response.iloc[idx]
 
-        row = self.response.iloc[
-            idx
-        ]
-
-        depmap_id = str(
-            row["depmap_id"]
-        )
-
-        broad_id = str(
-            row["broad_id"]
-        )
-
+        depmap_id = str(row["depmap_id"])
+        broad_id = str(row["broad_id"])
         smiles = row["smiles"]
-
-        label = row[
-            "logfold_change"
-        ]
+        label = row["logfold_change"]
 
         # ---------------------------------
         # Morgan fingerprint
         # ---------------------------------
-
         if broad_id in self.fingerprint_cache:
-
-            drug_fp = (
-                self.fingerprint_cache[
-                    broad_id
-                ]
-            )
-
+            drug_fp = self.fingerprint_cache[broad_id]
         else:
-
             drug_fp = smiles_to_morgan_fp(
                 smiles,
                 n_bits=self.fingerprint_bits,
@@ -502,25 +436,17 @@ class PharosDepMapDataset(Dataset):
         # ---------------------------------
         # Optional pretrained drug embedding
         # ---------------------------------
-
         if (
             self.use_drug_embeddings
-            and broad_id
-            in self.drug_embedding_cache
+            and broad_id in self.drug_embedding_cache
         ):
-            drug_embedding = (
-                self.drug_embedding_cache[
-                    broad_id
-                ]
-            )
-
+            drug_embedding = self.drug_embedding_cache[broad_id]
         else:
             drug_embedding = drug_fp
 
         # ---------------------------------
         # General expression
         # ---------------------------------
-
         cell_expr = (
             self.expression.loc[
                 depmap_id,
@@ -531,28 +457,33 @@ class PharosDepMapDataset(Dataset):
         )
 
         # ---------------------------------
+        # PPI-aligned expression
+        # IMPORTANT: self.ppi_gene_cols preserves the exact
+        # node order stored in pharos_ppi_graph.pt.
+        # ---------------------------------
+        ppi_expression = (
+            self.expression.loc[
+                depmap_id,
+                self.ppi_gene_cols,
+            ]
+            .values
+            .astype(np.float32)
+        )
+
+        # ---------------------------------
         # Optional cell embedding
         # ---------------------------------
-
         if (
             self.use_cell_embeddings
-            and depmap_id
-            in self.cell_embedding_cache
+            and depmap_id in self.cell_embedding_cache
         ):
-
-            cell_embedding = (
-                self.cell_embedding_cache[
-                    depmap_id
-                ]
-            )
-
+            cell_embedding = self.cell_embedding_cache[depmap_id]
         else:
             cell_embedding = cell_expr
 
         # ---------------------------------
         # Resistance expression
         # ---------------------------------
-
         resistance_expr = (
             self.expression.loc[
                 depmap_id,
@@ -565,38 +496,35 @@ class PharosDepMapDataset(Dataset):
         # ---------------------------------
         # Output
         # ---------------------------------
-
         output = {
             "drug_fp": torch.tensor(
                 drug_fp,
                 dtype=torch.float32,
             ),
-
             "cell_expr": torch.tensor(
                 cell_expr,
                 dtype=torch.float32,
             ),
-
+            "ppi_expression": torch.tensor(
+                ppi_expression,
+                dtype=torch.float32,
+            ),
             "resistance_expr": torch.tensor(
                 resistance_expr,
                 dtype=torch.float32,
             ),
-
             "label": torch.tensor(
                 [label],
                 dtype=torch.float32,
             ),
-
             "cell_embedding": torch.tensor(
                 cell_embedding,
                 dtype=torch.float32,
             ),
-
             "drug_embedding": torch.tensor(
                 drug_embedding,
                 dtype=torch.float32,
             ),
-
             "broad_id": broad_id,
             "depmap_id": depmap_id,
         }
@@ -604,13 +532,9 @@ class PharosDepMapDataset(Dataset):
         # ---------------------------------
         # Molecular graph
         # ---------------------------------
-
         if self.use_drug_graphs:
-
             output["drug_graph"] = (
-                self.drug_graph_cache[
-                    broad_id
-                ].clone()
+                self.drug_graph_cache[broad_id].clone()
             )
 
         return output
@@ -619,10 +543,7 @@ class PharosDepMapDataset(Dataset):
     # Metadata
     # =====================================
 
-    def get_metadata(
-        self
-    ) -> pd.DataFrame:
-
+    def get_metadata(self) -> pd.DataFrame:
         cols = [
             "depmap_id",
             "broad_id",
@@ -640,6 +561,4 @@ class PharosDepMapDataset(Dataset):
             if col in self.response.columns
         ]
 
-        return self.response[
-            cols
-        ].copy()
+        return self.response[cols].copy()

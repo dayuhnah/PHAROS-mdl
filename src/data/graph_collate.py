@@ -18,10 +18,8 @@ def pharos_graph_collate(batch):
         for item in batch
     ]
 
-    drug_graph_batch = (
-        Batch.from_data_list(
-            drug_graphs
-        )
+    drug_graph_batch = Batch.from_data_list(
+        drug_graphs
     )
 
     # ---------------------------------
@@ -38,6 +36,17 @@ def pharos_graph_collate(batch):
     cell_expr = torch.stack(
         [
             item["cell_expr"]
+            for item in batch
+        ]
+    )
+
+    # ---------------------------------
+    # PPI-aligned expression
+    # ---------------------------------
+
+    ppi_expression = torch.stack(
+        [
+            item["ppi_expression"]
             for item in batch
         ]
     )
@@ -84,10 +93,15 @@ def pharos_graph_collate(batch):
         for item in batch
     ]
 
+    # ---------------------------------
+    # Output batch
+    # ---------------------------------
+
     return {
         "drug_graph": drug_graph_batch,
         "drug_fp": drug_fp,
         "cell_expr": cell_expr,
+        "ppi_expression": ppi_expression,
         "resistance_expr": resistance_expr,
         "label": labels,
         "cell_embedding": cell_embedding,
