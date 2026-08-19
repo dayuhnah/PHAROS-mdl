@@ -31,4 +31,7 @@ wandb/
 .DS_Store
 
 # IDE
-.vscode/
+.vscode/data/models/clamp_clip/checkpoint.pt
+
+# Local CLAMP model checkpoint
+/data/models/clamp_clip/checkpoint.pt
